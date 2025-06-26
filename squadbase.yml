@@ -1,0 +1,11 @@
+name: miyamotoapp2.5
+ type: python
+ entrypoint: streamlit run app.py
+ python_version: 3.10
+
+ dependencies:
+   - pip: requirements.txt
+
+ env:
+   - key: API_KEY
+     value: "your_api_key_here" # 必要に応じて環境変数を設定 
