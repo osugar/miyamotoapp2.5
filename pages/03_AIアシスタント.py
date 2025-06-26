@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime
+import os
 
 # ページ設定
 st.set_page_config(
@@ -59,7 +60,7 @@ def call_llm_api(prompt, context=""):
         """
         
         # LLM APIにリクエスト送信（OpenAI互換形式）
-        api_key = st.secrets["API_KEY"]
+        api_key = os.environ.get("API_KEY")
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
@@ -99,13 +100,9 @@ st.title("🤖 AIアシスタント")
 st.markdown("---")
 
 # APIキーの確認
-if "API_KEY" not in st.secrets or st.secrets["API_KEY"] == "Your_LLM_API_Key_Here":
-    st.error("🔑 APIキーが設定されていません。")
-    st.info(
-        "管理者様へ：\n"
-        "1. `.streamlit/secrets.toml` ファイルを作成してください。\n"
-        "2. `API_KEY = \"ご自身のAPIキー\"` の形式でキーを保存してください。"
-    )
+api_key = os.environ.get("API_KEY")
+if not api_key or api_key == "Your_LLM_API_Key_Here":
+    st.error("🔑 APIキーが環境変数として設定されていません。デプロイ先の環境変数にAPI_KEYを登録してください。")
     st.stop()
 
 # サイドバー - データフィルター
