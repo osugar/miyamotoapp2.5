@@ -1,9 +1,6 @@
-name: miyamotoapp2.5
-services:
-  web:
-    start: streamlit run app.py
-    build:
-      python_version: "3.10"
-      requirements_path: requirements.txt
-    env:
-      API_KEY: your_api_key_here 
+morph_project:
+  entrypoint: streamlit run app.py
+  python_version: "3.10"
+  requirements_path: requirements.txt
+  env:
+    API_KEY: your_api_key_here 
