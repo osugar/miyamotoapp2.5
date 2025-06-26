@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from datetime import datetime
 import os
+import openai
 
 # ページ設定
 st.set_page_config(
@@ -59,34 +60,45 @@ def call_llm_api(prompt, context=""):
         {recent_sales}
         """
         
-        # LLM APIにリクエスト送信（OpenAI互換形式）
         api_key = os.environ.get("API_KEY")
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-        
-        payload = {
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": 1000,
-            "temperature": 0.7
-        }
-        
-        response = requests.post(
-            f"{LLM_URL}/v1/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=120
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result.get('choices', [{}])[0].get('message', {}).get('content', '回答を生成できませんでした。')
+        # LLM_URLがOpenAIのAPIエンドポイントの場合のみopenaiパッケージを使う例
+        if LLM_URL.startswith("https://api.openai.com"):  # OpenAI公式APIの場合
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         else:
-            return f"API接続エラー: {response.status_code} - {response.text}"
+            # ローカルLLMサーバー（OpenAI互換API）にはrequestsでPOST
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+            payload = {
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 1000,
+                "temperature": 0.7
+            }
+            response = requests.post(
+                f"{LLM_URL}/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=120
+            )
+            if response.status_code == 200:
+                result = response.json()
+                return result.get('choices', [{}])[0].get('message', {}).get('content', '回答を生成できませんでした。')
+            else:
+                return f"API接続エラー: {response.status_code} - {response.text}"
             
     except requests.exceptions.Timeout:
         return "LLMサーバーからの応答がタイムアウトしました（120秒）。サーバーの処理が重い可能性があります。しばらく待ってから再度お試しください。"

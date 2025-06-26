@@ -244,10 +244,10 @@ if selected_product:
 
         api_key = os.environ.get("API_KEY")
         try:
-            response = openai.ChatCompletion.create(
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                api_key=api_key
+                messages=[{"role": "user", "content": prompt}]
             )
             ai_answer = response.choices[0].message.content
             st.success("AIアドバイス:")
