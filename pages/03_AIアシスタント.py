@@ -24,7 +24,7 @@ def load_data():
 df = load_data()
 
 # LLM接続設定
-LLM_URL = "http://127.0.0.1:1234"
+LLM_URL = "https://api.openai.com"
 
 def call_llm_api(prompt, context=""):
     """LLM APIを呼び出す関数"""
