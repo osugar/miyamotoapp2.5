@@ -1,12 +1,9 @@
-project:
-  name: miyamotoapp2.5
-
+name: miyamotoapp2.5
 services:
-  - name: web
+  web:
     start: streamlit run app.py
-    env:
-      - key: API_KEY
-        value: "your_api_key_here"
     build:
       python_version: "3.10"
-      requirements_path: requirements.txt 
+      requirements_path: requirements.txt
+    env:
+      API_KEY: your_api_key_here 
