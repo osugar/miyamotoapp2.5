@@ -4,5 +4,4 @@ build:
   framework: streamlit
   runtime: python3.11
   package_manager: pip
-  entrypoint: app.py
-  requirements_path: requirements.txt 
+  entrypoint: app.py 
