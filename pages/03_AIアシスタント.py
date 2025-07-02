@@ -78,13 +78,21 @@ def analyze_data_for_context(filtered_df):
     return analysis
 
 def call_llm_api(prompt, context="", filtered_df=None):
-    """LLM APIを呼び出す関数（改善版）"""
+    """LLM APIを呼び出す関数（会話文脈対応版）"""
     try:
+        # チャット履歴（直近3件）を取得
+        chat_history = []
+        if "messages" in st.session_state:
+            for msg in st.session_state.messages[-3:]:
+                if msg["role"] == "user":
+                    chat_history.append(f"ユーザー: {msg['content']}")
+                else:
+                    chat_history.append(f"AI: {msg['content']}")
+        chat_history_text = "\n".join(chat_history)
+
         # フィルターされたデータの詳細分析
         if filtered_df is not None and len(filtered_df) > 0:
             analysis = analyze_data_for_context(filtered_df)
-            
-            # より詳細なデータサマリーを作成
             data_summary = f"""
             売上データの詳細分析:
             
@@ -124,23 +132,16 @@ def call_llm_api(prompt, context="", filtered_df=None):
         system_prompt = f"""
         あなたは優秀な売上データ分析アシスタントです。以下の指示に従って、正確で洞察に富んだ回答を提供してください：
 
-        【回答のルール】
-        1. 必ず具体的な数値データを含めて回答する
-        2. データに基づいた客観的な分析を行う
-        3. トレンドやパターンを特定し、その理由を考察する
-        4. 改善提案や推奨事項を具体的に示す
-        5. 日本語で分かりやすく回答する
-        6. 必要に応じて表形式でデータを整理する
+        【会話のルール】
+        1. 直前の会話履歴や追加質問の文脈を必ず考慮し、会話が自然につながるように答えてください。
+        2. ユーザーの意図や質問の背景を推測し、必要に応じて逆質問や確認も行ってください。
+        3. 具体的な数値やデータを根拠に、分かりやすく日本語で回答してください。
+        4. 必要に応じて表や箇条書きで整理してください。
 
-        【分析の視点】
-        - 売上トレンド：時系列での変化と要因
-        - 担当者パフォーマンス：個人別の成果と特徴
-        - 商品分析：売上・粗利率・人気度
-        - 顧客分析：重要顧客と購買パターン
-        - 収益性：粗利率と改善点
+        【会話履歴】
+        {chat_history_text}
 
         {context}
-        
         {data_summary}
         """
         
