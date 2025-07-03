@@ -14,6 +14,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# カスタムCSSでレイアウトを改善
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+        margin-bottom: 1rem;
+    }
+    .analysis-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    .chat-container {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #e9ecef;
+    }
+    .sidebar-section {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border: 1px solid #e9ecef;
+    }
+    .stButton > button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+    .stSelectbox > div > div {
+        border-radius: 8px;
+    }
+    .stDateInput > div > div {
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # データ読み込み関数
 @st.cache_data
 def load_data():
@@ -195,8 +248,7 @@ def call_llm_api(prompt, context="", filtered_df=None):
         return f"予期せぬエラーが発生しました: {str(e)}"
 
 # メインページ
-st.title("🤖 AIアシスタント")
-st.markdown("---")
+st.markdown('<div class="main-header"><h1>🤖 AIアシスタント</h1><p>売上データの分析とAIによる洞察を提供します</p></div>', unsafe_allow_html=True)
 
 # APIキーの確認
 api_key = os.environ.get("API_KEY")
@@ -205,25 +257,51 @@ if not api_key or api_key == "Your_LLM_API_Key_Here":
     st.stop()
 
 # サイドバー - データフィルター
-st.sidebar.header("📊 データフィルター")
-
-# 期間フィルター
-min_date = df['売上年月'].min()
-max_date = df['売上年月'].max()
-date_range = st.sidebar.date_input(
-    "期間選択",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date
-)
-
-# 担当者フィルター
-all_staff = ['全て'] + sorted(df['担当者'].unique().tolist())
-selected_staff = st.sidebar.selectbox("担当者", all_staff)
-
-# 商品フィルター
-all_products = ['全て'] + sorted(df['商品名'].unique().tolist())
-selected_product = st.sidebar.selectbox("商品", all_products)
+with st.sidebar:
+    st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+    st.header("📊 データフィルター")
+    
+    # 期間フィルター
+    min_date = df['売上年月'].min()
+    max_date = df['売上年月'].max()
+    date_range = st.date_input(
+        "📅 期間選択",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+        help="分析対象の期間を選択してください"
+    )
+    
+    # 担当者フィルター
+    all_staff = ['全て'] + sorted(df['担当者'].unique().tolist())
+    selected_staff = st.selectbox(
+        "👥 担当者",
+        all_staff,
+        help="特定の担当者のデータのみを分析対象にします"
+    )
+    
+    # 商品フィルター
+    all_products = ['全て'] + sorted(df['商品名'].unique().tolist())
+    selected_product = st.selectbox(
+        "📦 商品",
+        all_products,
+        help="特定の商品のデータのみを分析対象にします"
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 接続状況表示
+    st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+    st.markdown("### 🔗 LLM接続状況")
+    try:
+        response = requests.get(f"{LLM_URL}/health", timeout=5)
+        if response.status_code == 200:
+            st.success("✅ LLMサーバー接続中")
+        else:
+            st.error("❌ LLMサーバーエラー")
+    except:
+        st.error("❌ LLMサーバー未接続")
+        st.info("LLMサーバーを起動してください")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # フィルター適用
 filtered_df = df.copy()
@@ -250,7 +328,57 @@ filter_context = f"""
 - フィルター適用後のデータ件数: {len(filtered_df):,}件
 """
 
+# データサマリー表示
+st.markdown('<div class="analysis-section">', unsafe_allow_html=True)
+st.subheader("📊 現在のデータサマリー")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    total_sales = filtered_df['売上金額'].sum()
+    st.markdown(f'<div class="metric-card"><h4>総売上金額</h4><h3>¥{total_sales:,}</h3></div>', unsafe_allow_html=True)
+
+with col2:
+    total_profit = filtered_df['粗利金額'].sum()
+    st.markdown(f'<div class="metric-card"><h4>総粗利金額</h4><h3>¥{total_profit:,}</h3></div>', unsafe_allow_html=True)
+
+with col3:
+    profit_rate = (total_profit / total_sales * 100) if total_sales > 0 else 0
+    st.markdown(f'<div class="metric-card"><h4>粗利率</h4><h3>{profit_rate:.1f}%</h3></div>', unsafe_allow_html=True)
+
+with col4:
+    avg_sales = filtered_df['売上金額'].mean()
+    st.markdown(f'<div class="metric-card"><h4>平均売上</h4><h3>¥{avg_sales:,.0f}</h3></div>', unsafe_allow_html=True)
+
+# 追加の統計情報
+if len(filtered_df) > 0:
+    st.subheader("📈 詳細統計")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        top_staff = filtered_df.groupby('担当者')['売上金額'].sum().sort_values(ascending=False).head(1)
+        if not top_staff.empty:
+            st.markdown(f'<div class="metric-card"><h4>売上No.1担当者</h4><h3>{top_staff.index[0]}</h3><p>¥{top_staff.iloc[0]:,}</p></div>', unsafe_allow_html=True)
+    
+    with col2:
+        top_product = filtered_df.groupby('商品名')['売上金額'].sum().sort_values(ascending=False).head(1)
+        if not top_product.empty:
+            st.markdown(f'<div class="metric-card"><h4>売上No.1商品</h4><h3>{top_product.index[0]}</h3><p>¥{top_product.iloc[0]:,}</p></div>', unsafe_allow_html=True)
+    
+    with col3:
+        top_customer = filtered_df.groupby('顧客名')['売上金額'].sum().sort_values(ascending=False).head(1)
+        if not top_customer.empty:
+            st.markdown(f'<div class="metric-card"><h4>売上No.1顧客</h4><h3>{top_customer.index[0]}</h3><p>¥{top_customer.iloc[0]:,}</p></div>', unsafe_allow_html=True)
+    
+    with col4:
+        best_profit_rate = filtered_df.groupby('商品名').apply(
+            lambda x: (x['粗利金額'].sum() / x['売上金額'].sum() * 100) if x['売上金額'].sum() > 0 else 0
+        ).sort_values(ascending=False).head(1)
+        if not best_profit_rate.empty:
+            st.markdown(f'<div class="metric-card"><h4>最高粗利率商品</h4><h3>{best_profit_rate.index[0]}</h3><p>{best_profit_rate.iloc[0]:.1f}%</p></div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
 # チャットインターフェース
+st.markdown('<div class="analysis-section">', unsafe_allow_html=True)
 st.subheader("💬 AIアシスタントに質問")
 
 # チャット履歴の初期化
@@ -258,6 +386,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # チャット履歴の表示
+st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -277,14 +406,18 @@ if prompt := st.chat_input("売上データについて質問してください.
     
     # AIメッセージを追加
     st.session_state.messages.append({"role": "assistant", "content": response})
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # 高度な分析機能
+st.markdown('<div class="analysis-section">', unsafe_allow_html=True)
 st.subheader("🔍 高度な分析機能")
 
 # 分析タイプの選択
 analysis_type = st.selectbox(
     "分析タイプを選択",
-    ["基本分析", "詳細トレンド分析", "パフォーマンス比較", "予測分析", "改善提案"]
+    ["基本分析", "詳細トレンド分析", "パフォーマンス比較", "予測分析", "改善提案"],
+    help="実行したい分析の種類を選択してください"
 )
 
 if analysis_type == "基本分析":
@@ -431,8 +564,10 @@ elif analysis_type == "改善提案":
                 question = "長期的な成長戦略を、市場分析、競合分析、内部リソースの観点から提案してください。"
                 response = call_llm_api(question, filter_context, filtered_df)
                 st.info(response)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # チャット履歴管理
+st.markdown('<div class="analysis-section">', unsafe_allow_html=True)
 st.subheader("💬 チャット履歴管理")
 col1, col2 = st.columns(2)
 
@@ -456,63 +591,4 @@ with col2:
                 file_name=f"ai_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain"
             )
-
-# データサマリー表示
-st.subheader("📊 現在のデータサマリー")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    total_sales = filtered_df['売上金額'].sum()
-    st.metric("総売上金額", f"¥{total_sales:,}")
-
-with col2:
-    total_profit = filtered_df['粗利金額'].sum()
-    st.metric("総粗利金額", f"¥{total_profit:,}")
-
-with col3:
-    profit_rate = (total_profit / total_sales * 100) if total_sales > 0 else 0
-    st.metric("粗利率", f"{profit_rate:.1f}%")
-
-with col4:
-    avg_sales = filtered_df['売上金額'].mean()
-    st.metric("平均売上", f"¥{avg_sales:,.0f}")
-
-# 追加の統計情報
-if len(filtered_df) > 0:
-    st.subheader("📈 詳細統計")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        top_staff = filtered_df.groupby('担当者')['売上金額'].sum().sort_values(ascending=False).head(1)
-        if not top_staff.empty:
-            st.metric("売上No.1担当者", f"{top_staff.index[0]}\n¥{top_staff.iloc[0]:,}")
-    
-    with col2:
-        top_product = filtered_df.groupby('商品名')['売上金額'].sum().sort_values(ascending=False).head(1)
-        if not top_product.empty:
-            st.metric("売上No.1商品", f"{top_product.index[0]}\n¥{top_product.iloc[0]:,}")
-    
-    with col3:
-        top_customer = filtered_df.groupby('顧客名')['売上金額'].sum().sort_values(ascending=False).head(1)
-        if not top_customer.empty:
-            st.metric("売上No.1顧客", f"{top_customer.index[0]}\n¥{top_customer.iloc[0]:,}")
-    
-    with col4:
-        best_profit_rate = filtered_df.groupby('商品名').apply(
-            lambda x: (x['粗利金額'].sum() / x['売上金額'].sum() * 100) if x['売上金額'].sum() > 0 else 0
-        ).sort_values(ascending=False).head(1)
-        if not best_profit_rate.empty:
-            st.metric("最高粗利率商品", f"{best_profit_rate.index[0]}\n{best_profit_rate.iloc[0]:.1f}%")
-
-# 接続状況表示
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔗 LLM接続状況")
-try:
-    response = requests.get(f"{LLM_URL}/health", timeout=5)
-    if response.status_code == 200:
-        st.sidebar.success("✅ LLMサーバー接続中")
-    else:
-        st.sidebar.error("❌ LLMサーバーエラー")
-except:
-    st.sidebar.error("❌ LLMサーバー未接続")
-    st.sidebar.info("LLMサーバーを起動してください") 
+st.markdown('</div>', unsafe_allow_html=True) 
