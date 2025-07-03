@@ -1,0 +1,19 @@
+# アプリケーション設定
+APP_NAME=売上ダッシュボード
+APP_VERSION=2.0.0
+
+# API設定
+API_KEY=your_openai_api_key_here
+LLM_URL=https://api.openai.com
+
+# 機能設定
+ENABLE_AI_FEATURES=true
+ENABLE_EXPORT=true
+ENABLE_VALIDATION=true
+
+# パフォーマンス設定
+MAX_RECORDS_DISPLAY=1000
+CACHE_TTL=3600
+
+# データ設定
+DATA_FILE=sales_test_data_utf8.csv 

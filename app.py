@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime
+from utils import data_manager, FilterManager, ChartManager
 
 # ページ設定
 st.set_page_config(
@@ -14,16 +15,62 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# データ読み込み関数
-@st.cache_data
-def load_data():
-    df = pd.read_csv('sales_test_data_utf8.csv')
-    # 売上年月をdatetime型に変換
-    df['売上年月'] = pd.to_datetime(df['売上年月'], format='%Y-%m')
-    return df
+# カスタムCSSでローディング状態を改善
+st.markdown("""
+<style>
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        background: #f0f2f6;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+    .error-container {
+        background: #ffebee;
+        border: 1px solid #f44336;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: #c62828;
+    }
+    .success-container {
+        background: #e8f5e8;
+        border: 1px solid #4caf50;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: #2e7d32;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # データ読み込み
-df = load_data()
+with st.spinner("データを読み込み中..."):
+    df = data_manager.load_data()
+
+# データが空の場合はエラーメッセージを表示
+if df.empty:
+    st.error("データの読み込みに失敗しました。CSVファイルが正しい形式で配置されているか確認してください。")
+    st.stop()
+
+# データ検証
+validation_result = data_manager.validate_data(df)
+if not validation_result['is_valid']:
+    st.warning("データに問題が検出されました:")
+    for issue in validation_result['issues']:
+        st.write(f"⚠️ {issue}")
+
+# データ概要表示
+if st.sidebar.checkbox("データ概要を表示"):
+    st.sidebar.markdown("### 📊 データ概要")
+    summary = validation_result['summary']
+    st.sidebar.markdown(f"**総レコード数:** {summary['total_records']:,}件")
+    st.sidebar.markdown(f"**期間:** {summary['date_range']}")
+    st.sidebar.markdown(f"**担当者数:** {summary['staff_count']}名")
+    st.sidebar.markdown(f"**商品数:** {summary['product_count']}種類")
+    st.sidebar.markdown(f"**顧客数:** {summary['customer_count']}社")
 
 # サイドバー - フィルター
 st.sidebar.header("📊 フィルター設定")
@@ -35,62 +82,50 @@ date_range = st.sidebar.date_input(
     "期間選択",
     value=(min_date, max_date),
     min_value=min_date,
-    max_value=max_date
+    max_value=max_date,
+    help="分析対象の期間を選択してください"
 )
 
 # 担当者フィルター
 all_staff = ['全て'] + sorted(df['担当者'].unique().tolist())
-selected_staff = st.sidebar.selectbox("担当者", all_staff)
+selected_staff = st.sidebar.selectbox(
+    "担当者", 
+    all_staff,
+    help="特定の担当者のデータのみを表示します"
+)
 
 # 商品フィルター
 all_products = ['全て'] + sorted(df['商品名'].unique().tolist())
-selected_product = st.sidebar.selectbox("商品", all_products)
+selected_product = st.sidebar.selectbox(
+    "商品", 
+    all_products,
+    help="特定の商品のデータのみを表示します"
+)
 
 # 顧客フィルター
 all_customers = ['全て'] + sorted(df['顧客名'].unique().tolist())
-selected_customer = st.sidebar.selectbox("顧客", all_customers)
+selected_customer = st.sidebar.selectbox(
+    "顧客", 
+    all_customers,
+    help="特定の顧客のデータのみを表示します"
+)
 
 # フィルター適用
-filtered_df = df.copy()
+filtered_df = FilterManager.apply_filters(
+    df, date_range, selected_staff, selected_product, selected_customer
+)
 
-if len(date_range) == 2:
-    start_date, end_date = date_range
-    filtered_df = filtered_df[
-        (filtered_df['売上年月'].dt.date >= start_date) &
-        (filtered_df['売上年月'].dt.date <= end_date)
-    ]
-
-if selected_staff != '全て':
-    filtered_df = filtered_df[filtered_df['担当者'] == selected_staff]
-
-if selected_product != '全て':
-    filtered_df = filtered_df[filtered_df['商品名'] == selected_product]
-
-if selected_customer != '全て':
-    filtered_df = filtered_df[filtered_df['顧客名'] == selected_customer]
+# フィルター結果の表示
+if len(filtered_df) == 0:
+    st.warning("選択されたフィルター条件に該当するデータがありません。")
+    st.stop()
 
 # メインページ
 st.title("📊 売上ダッシュボード")
 st.markdown("---")
 
 # KPI カード
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    total_sales = filtered_df['売上金額'].sum()
-    st.metric("総売上金額", f"¥{total_sales:,}")
-
-with col2:
-    total_profit = filtered_df['粗利金額'].sum()
-    st.metric("総粗利金額", f"¥{total_profit:,}")
-
-with col3:
-    profit_rate = (total_profit / total_sales * 100) if total_sales > 0 else 0
-    st.metric("粗利率", f"{profit_rate:.1f}%")
-
-with col4:
-    avg_sales = filtered_df['売上金額'].mean()
-    st.metric("平均売上", f"¥{avg_sales:,.0f}")
+ChartManager.create_kpi_cards(filtered_df)
 
 st.markdown("---")
 
@@ -177,8 +212,45 @@ fig.update_yaxes(title_text="昨対比 (%)", row=2, col=1)
 
 st.plotly_chart(fig, use_container_width=True)
 
+# 追加分析セクション
+st.markdown("---")
+st.subheader("📊 追加分析")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("**🏆 売上TOP10商品**")
+    top_products = filtered_df.groupby('商品名')['売上金額'].sum().sort_values(ascending=False).head(10)
+    top_products_df = pd.DataFrame({
+        '商品名': top_products.index,
+        '売上金額': top_products.values
+    })
+    top_products_df['売上金額'] = top_products_df['売上金額'].apply(ChartManager.format_currency)
+    st.dataframe(top_products_df, use_container_width=True, hide_index=True)
+
+with col2:
+    st.markdown("**👥 売上TOP10担当者**")
+    top_staff = filtered_df.groupby('担当者')['売上金額'].sum().sort_values(ascending=False).head(10)
+    top_staff_df = pd.DataFrame({
+        '担当者': top_staff.index,
+        '売上金額': top_staff.values
+    })
+    top_staff_df['売上金額'] = top_staff_df['売上金額'].apply(ChartManager.format_currency)
+    st.dataframe(top_staff_df, use_container_width=True, hide_index=True)
+
 # 詳細データテーブル
+st.markdown("---")
 st.subheader("📋 詳細データ")
+
+# データエクスポート機能
+csv = filtered_df.to_csv(index=False, encoding='utf-8-sig')
+st.download_button(
+    label="📥 CSVダウンロード",
+    data=csv,
+    file_name=f"売上データ_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+    mime="text/csv"
+)
+
 st.dataframe(
     filtered_df.sort_values('売上年月', ascending=False),
     use_container_width=True,
@@ -193,3 +265,9 @@ st.sidebar.markdown(f"**担当者:** {selected_staff}")
 st.sidebar.markdown(f"**商品:** {selected_product}")
 st.sidebar.markdown(f"**顧客:** {selected_customer}")
 st.sidebar.markdown(f"**データ件数:** {len(filtered_df):,}件")
+
+# パフォーマンス情報
+if st.sidebar.checkbox("パフォーマンス情報を表示"):
+    st.sidebar.markdown("### ⚡ パフォーマンス")
+    st.sidebar.markdown(f"**処理時間:** {st.session_state.get('processing_time', 'N/A')}")
+    st.sidebar.markdown(f"**メモリ使用量:** {st.session_state.get('memory_usage', 'N/A')}")
